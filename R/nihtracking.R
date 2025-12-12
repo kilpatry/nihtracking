@@ -298,6 +298,32 @@ run_cli <- function() {
   )
   summary <- summarize_by_fiscal_year(projects)
 
+  if (length(summary) == 0) {
+    warning(
+      paste(
+        "No fiscal-year totals were produced. This can happen when projects are",
+        "missing fiscal year or award amounts, or when results were truncated by",
+        "--max-records-per-year. Refine --query or narrow the fiscal year range."
+      )
+    )
+
+    if (!is.null(args[["raw-output"]])) {
+      write_raw_json(projects, args[["raw-output"]])
+      message(sprintf("Wrote raw project data to %s", args[["raw-output"]]))
+    }
+
+    if (!is.null(args[["summary-output"]])) {
+      write_summary_csv(summary, args[["summary-output"]])
+      message(sprintf("Wrote empty summary CSV to %s", args[["summary-output"]]))
+    }
+
+    if (!is.null(args[["plot-output"]])) {
+      message("Skipping plot because summary is empty.")
+    }
+
+    return(invisible(NULL))
+  }
+
   for (i in seq_along(summary)) {
     fy <- names(summary)[[i]]
     total <- summary[[i]]

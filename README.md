@@ -51,6 +51,7 @@ The R workflow mirrors the Python CLI but uses `httr`, `jsonlite`, and (optional
 - Award totals depend on the `award_amount` field reported by RePORTER; records missing this value are treated as zero during aggregation.
 - Plotting requires `ggplot2`; if you only need CSV/JSON outputs you can omit it.
 - Requests are split by fiscal year to avoid NIH RePORTER's pagination ceiling (offsets above 14,999 are rejected). If a single year's query still returns that many results, the CLI warns and caps retrieval at the limit; narrow the text phrase or use `--max-records-per-year` to set a tighter cap while you refine the search.
+- If the capped results or missing fiscal-year/award data produce an empty summary, the CLI now warns, writes any requested raw output, and skips plotting; refine the query or year range and rerun.
 
 ## Python version (still available)
 
