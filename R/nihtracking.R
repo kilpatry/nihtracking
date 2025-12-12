@@ -41,7 +41,7 @@ search_projects <- function(query, years, limit = 500L, include_fields = DEFAULT
 
   repeat {
     payload <- list(
-      criteria = list(text_phrase = query, fiscal_years = years),
+      criteria = list(text_phrase = query, fiscal_years = as.list(years)),
       include_fields = unname(include_fields),
       limit = limit,
       offset = offset
