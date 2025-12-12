@@ -33,6 +33,12 @@ The R workflow mirrors the Python CLI but uses `httr`, `jsonlite`, and (optional
    Rscript R/neonatal_tracker.R --start-year 2018 --end-year 2023 --plot-output plots/neonatal_trend.png
    ```
 
+   If you expect very large result sets for a single fiscal year, cap retrievals to avoid NIH's offset ceiling (14,999) while you refine your query:
+
+   ```bash
+   Rscript R/neonatal_tracker.R --start-year 2018 --end-year 2018 --max-records-per-year 10000
+   ```
+
 4) For help at any time, run:
 
    ```bash
@@ -44,7 +50,7 @@ The R workflow mirrors the Python CLI but uses `httr`, `jsonlite`, and (optional
 - The CLI contacts the live NIH RePORTER API, so you need network access and any required proxy configuration (`HTTP_PROXY`/`HTTPS_PROXY`).
 - Award totals depend on the `award_amount` field reported by RePORTER; records missing this value are treated as zero during aggregation.
 - Plotting requires `ggplot2`; if you only need CSV/JSON outputs you can omit it.
-- Requests are split by fiscal year to avoid NIH RePORTER's pagination ceiling (offsets above 14,999 are rejected). If a single year's query still returns that many results, narrow the text phrase with more specific neonatal terms.
+- Requests are split by fiscal year to avoid NIH RePORTER's pagination ceiling (offsets above 14,999 are rejected). If a single year's query still returns that many results, the CLI warns and caps retrieval at the limit; narrow the text phrase or use `--max-records-per-year` to set a tighter cap while you refine the search.
 
 ## Python version (still available)
 

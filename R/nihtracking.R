@@ -24,11 +24,22 @@ stop_for_missing_packages <- function(packages) {
   }
 }
 
-search_projects <- function(query, years, limit = 500L, include_fields = DEFAULT_FIELDS) {
+search_projects <- function(
+  query,
+  years,
+  limit = 500L,
+  include_fields = DEFAULT_FIELDS,
+  max_records_per_query = 14999L
+) {
   stop_for_missing_packages(c("httr", "jsonlite"))
 
   if (limit > 500) {
     stop("NIH RePORTER only supports page sizes up to 500 records.")
+  }
+
+  max_records <- as.integer(max_records_per_query)
+  if (is.na(max_records) || max_records <= 0) {
+    stop("max_records_per_query must be a positive integer.")
   }
 
   years <- as.integer(years)
@@ -37,13 +48,21 @@ search_projects <- function(query, years, limit = 500L, include_fields = DEFAULT
   }
 
   offset <- 0L
+  total_allowed <- NULL
   all_results <- list()
 
   repeat {
+    remaining <- max_records - offset
+    if (remaining <= 0) {
+      break
+    }
+
+    request_limit <- min(limit, remaining)
+
     payload <- list(
       criteria = list(text_phrase = query, fiscal_years = as.list(years)),
       include_fields = unname(include_fields),
-      limit = limit,
+      limit = request_limit,
       offset = offset
     )
 
@@ -68,6 +87,25 @@ search_projects <- function(query, years, limit = 500L, include_fields = DEFAULT
     }
 
     parsed <- httr::content(resp, as = "parsed", type = "application/json")
+
+    if (is.null(total_allowed)) {
+      reported_total <- parsed$meta$total %||% 0
+      total_allowed <- min(reported_total, max_records)
+      if (reported_total > max_records) {
+        warning(
+          sprintf(
+            paste(
+              "NIH RePORTER returned %s projects; retrieving the first %s to avoid",
+              "the 14,999 offset limit. Refine --query or the fiscal year range to",
+              "reduce results."
+            ),
+            reported_total,
+            max_records
+          )
+        )
+      }
+    }
+
     page <- parsed$results
 
     if (is.null(page) || length(page) == 0) {
@@ -76,9 +114,12 @@ search_projects <- function(query, years, limit = 500L, include_fields = DEFAULT
 
     all_results <- c(all_results, page)
 
-    total <- parsed$meta$total
-    offset <- offset + limit
-    if (offset >= total) {
+    offset <- offset + length(page)
+    if (offset >= total_allowed) {
+      break
+    }
+
+    if (length(page) < request_limit) {
       break
     }
   }
@@ -166,12 +207,12 @@ plot_summary <- function(summary, path) {
   ggplot2::ggsave(filename = path, plot = p, width = 7, height = 4.5, dpi = 150)
 }
 
-collect_projects <- function(query, years) {
+collect_projects <- function(query, years, max_records_per_year = 14999L) {
   all_projects <- list()
   distinct_years <- sort(unique(as.integer(years)))
 
   for (year in distinct_years) {
-    year_results <- search_projects(query, year)
+    year_results <- search_projects(query, year, max_records_per_query = max_records_per_year)
     all_projects <- c(all_projects, year_results)
   }
 
@@ -186,6 +227,7 @@ actionable_message <- function() {
     "  --start-year       First fiscal year to include (required)\n",
     "  --end-year         Last fiscal year to include (required)\n",
     "  --query            Override the default neonatal text phrase\n",
+    "  --max-records-per-year  Maximum projects to retrieve per fiscal year (default 14999)\n",
     "  --summary-output   CSV path for fiscal-year totals\n",
     "  --raw-output       JSON path for raw project data\n",
     "  --plot-output      Image path for funding-over-time plot (PNG recommended)\n",
@@ -231,6 +273,12 @@ parse_args <- function(args) {
     stop("--start-year cannot be after --end-year.")
   }
   parsed[["query"]] <- parsed[["query"]] %||% DEFAULT_QUERY
+  if (!is.null(parsed[["max-records-per-year"]])) {
+    parsed[["max-records-per-year"]] <- as.integer(parsed[["max-records-per-year"]])
+    if (is.na(parsed[["max-records-per-year"]]) || parsed[["max-records-per-year"]] <= 0) {
+      stop("--max-records-per-year must be a positive integer.")
+    }
+  }
 
   parsed
 }
@@ -243,7 +291,11 @@ run_cli <- function() {
   args <- parse_args(commandArgs(trailingOnly = TRUE))
   years <- seq(args[["start-year"]], args[["end-year"]])
 
-  projects <- collect_projects(args$query, years)
+  projects <- collect_projects(
+    args$query,
+    years,
+    max_records_per_year = args[["max-records-per-year"]] %||% 14999L
+  )
   summary <- summarize_by_fiscal_year(projects)
 
   for (i in seq_along(summary)) {
