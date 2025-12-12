@@ -167,7 +167,15 @@ plot_summary <- function(summary, path) {
 }
 
 collect_projects <- function(query, years) {
-  search_projects(query, years)
+  all_projects <- list()
+  distinct_years <- sort(unique(as.integer(years)))
+
+  for (year in distinct_years) {
+    year_results <- search_projects(query, year)
+    all_projects <- c(all_projects, year_results)
+  }
+
+  all_projects
 }
 
 actionable_message <- function() {

@@ -44,6 +44,7 @@ The R workflow mirrors the Python CLI but uses `httr`, `jsonlite`, and (optional
 - The CLI contacts the live NIH RePORTER API, so you need network access and any required proxy configuration (`HTTP_PROXY`/`HTTPS_PROXY`).
 - Award totals depend on the `award_amount` field reported by RePORTER; records missing this value are treated as zero during aggregation.
 - Plotting requires `ggplot2`; if you only need CSV/JSON outputs you can omit it.
+- Requests are split by fiscal year to avoid NIH RePORTER's pagination ceiling (offsets above 14,999 are rejected). If a single year's query still returns that many results, narrow the text phrase with more specific neonatal terms.
 
 ## Python version (still available)
 
