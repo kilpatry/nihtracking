@@ -32,13 +32,17 @@ search_projects <- function(query, years, limit = 500L, include_fields = DEFAULT
   }
 
   years <- as.integer(years)
+  if (length(years) == 0 || anyNA(years)) {
+    stop("At least one valid fiscal year is required for the search.")
+  }
+
   offset <- 0L
   all_results <- list()
 
   repeat {
     payload <- list(
       criteria = list(text_phrase = query, fiscal_years = years),
-      include_fields = as.list(include_fields),
+      include_fields = unname(include_fields),
       limit = limit,
       offset = offset
     )
@@ -47,9 +51,21 @@ search_projects <- function(query, years, limit = 500L, include_fields = DEFAULT
       API_URL,
       body = payload,
       encode = "json",
+      httr::content_type_json(),
+      httr::accept_json(),
       httr::timeout(30)
     )
-    httr::stop_for_status(resp)
+
+    if (httr::http_error(resp)) {
+      detail <- tryCatch(
+        httr::content(resp, as = "text", encoding = "UTF-8"),
+        error = function(e) "<no response body>"
+      )
+      stop(
+        sprintf("NIH RePORTER request failed: HTTP %s: %s", httr::status_code(resp), detail),
+        call. = FALSE
+      )
+    }
 
     parsed <- httr::content(resp, as = "parsed", type = "application/json")
     page <- parsed$results
@@ -200,6 +216,12 @@ parse_args <- function(args) {
 
   parsed[["start-year"]] <- as.integer(parsed[["start-year"]])
   parsed[["end-year"]] <- as.integer(parsed[["end-year"]])
+  if (is.na(parsed[["start-year"]]) || is.na(parsed[["end-year"]])) {
+    stop("--start-year and --end-year must be valid integers.")
+  }
+  if (parsed[["start-year"]] > parsed[["end-year"]]) {
+    stop("--start-year cannot be after --end-year.")
+  }
   parsed[["query"]] <- parsed[["query"]] %||% DEFAULT_QUERY
 
   parsed
